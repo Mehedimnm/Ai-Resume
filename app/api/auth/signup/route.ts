@@ -28,27 +28,38 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
 
-  if (await findByEmail(email)) {
+  try {
+    if (await findByEmail(email)) {
+      return NextResponse.json(
+        { error: "An account with this email already exists." },
+        { status: 409 }
+      );
+    }
+
+    const user = await createUser({
+      name,
+      email,
+      passwordHash: hashPassword(password),
+    });
+    const token = createSessionToken(user.id);
+
+    const res = NextResponse.json({ user: toPublic(user) }, { status: 201 });
+    res.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: SESSION_MAX_AGE,
+    });
+    return res;
+  } catch (err) {
+    console.error("[signup] database error:", err);
     return NextResponse.json(
-      { error: "An account with this email already exists." },
-      { status: 409 }
+      {
+        error:
+          "We couldn't reach the database. Please try again shortly. (If this persists, the server database connection is not configured.)",
+      },
+      { status: 503 }
     );
   }
-
-  const user = await createUser({
-    name,
-    email,
-    passwordHash: hashPassword(password),
-  });
-  const token = createSessionToken(user.id);
-
-  const res = NextResponse.json({ user: toPublic(user) }, { status: 201 });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
-  return res;
 }

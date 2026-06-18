@@ -23,23 +23,34 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const user = await findByEmail(email);
-  // Use the same message for missing user / wrong password to avoid leaking info.
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  try {
+    const user = await findByEmail(email);
+    // Use the same message for missing user / wrong password to avoid leaking info.
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      return NextResponse.json(
+        { error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
+    const token = createSessionToken(user.id);
+    const res = NextResponse.json({ user: toPublic(user) });
+    res.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: SESSION_MAX_AGE,
+    });
+    return res;
+  } catch (err) {
+    console.error("[login] database error:", err);
     return NextResponse.json(
-      { error: "Invalid email or password." },
-      { status: 401 }
+      {
+        error:
+          "We couldn't reach the database. Please try again shortly. (If this persists, the server database connection is not configured.)",
+      },
+      { status: 503 }
     );
   }
-
-  const token = createSessionToken(user.id);
-  const res = NextResponse.json({ user: toPublic(user) });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
-  return res;
 }

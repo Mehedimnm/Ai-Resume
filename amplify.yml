@@ -6,6 +6,10 @@ frontend:
         - npm install
     build:
       commands:
+        # Amplify Console env vars are available during build but NOT to the
+        # Next.js SSR runtime by default. Write the server-side vars into
+        # .env.production so they are bundled and available at runtime.
+        - env | grep -E '^(MONGODB_URI|MONGODB_DB|AUTH_SECRET|GEMINI_API_KEY|GEMINI_MODEL|GEMINI_FALLBACK_MODELS|NEXT_PUBLIC_SITE_URL)=' >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
